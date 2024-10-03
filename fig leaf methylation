@@ -1,0 +1,70 @@
+Python Workflow for Gene Methylation Analysis in Fig Leaf
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from scipy.stats import ttest_ind
+
+# Step 1: Load the methylation data (CpG sites as rows, samples as columns)
+# Assume the methylation data is available as a CSV file
+methylation_data = pd.read_csv('fig_leaf_methylation_data.csv')
+
+# Display the first few rows to understand the structure
+print(methylation_data.head())
+
+# Step 2: Normalize the methylation data (e.g., beta values representing methylation %)
+# Using StandardScaler to normalize the data
+scaler = StandardScaler()
+normalized_data = scaler.fit_transform(methylation_data)
+
+# Step 3: Perform Principal Component Analysis (PCA) to visualize methylation patterns
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(normalized_data)
+
+# Plot PCA results to see clustering between different samples
+plt.figure(figsize=(8,6))
+# Assuming sample labels (e.g., condition1, condition2) are alternated
+plt.scatter(pca_result[:, 0], pca_result[:, 1], c=['green' if i % 2 == 0 else 'brown' for i in range(len(methylation_data))])
+plt.title('PCA of Methylation Data for Fig Leaf Samples')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.show()
+
+# Step 4: Identify Differentially Methylated Regions (DMRs)
+# Here we assume two groups: "condition1" (fig leaf under certain conditions) vs "condition2"
+# Alternating labels for simplicity (can be based on actual experimental conditions)
+labels = ['condition1', 'condition2'] * (methylation_data.shape[1] // 2)
+
+# Apply a t-test to compare methylation levels between the two conditions for each CpG site
+ttest_results = []
+for i in range(methylation_data.shape[0]):
+    # Assuming odd columns are condition1 and even columns are condition2
+    group1 = methylation_data.iloc[i, ::2]  # condition1
+    group2 = methylation_data.iloc[i, 1::2]  # condition2
+    t_stat, p_value = ttest_ind(group1, group2)
+    ttest_results.append(p_value)
+
+# Step 5: Adjust for multiple testing (using Bonferroni correction for simplicity)
+adjusted_p_values = np.minimum(1, np.array(ttest_results) * methylation_data.shape[0])
+
+# Step 6: Identify significant DMRs
+# Define significance threshold (e.g., p-value < 0.05)
+significant_dmrs = np.where(adjusted_p_values < 0.05)[0]
+print(f"Significant differentially methylated regions found at CpG sites: {significant_dmrs}")
+
+# Step 7: Save significant DMRs to a CSV file for further analysis
+significant_cpgs = methylation_data.iloc[significant_dmrs]
+significant_cpgs.to_csv('significant_dmrs_fig_leaf.csv', index=False)
+
+# Additional Step: Plot methylation levels for a specific DMR (optional)
+dmr_index = significant_dmrs[0]  # Just as an example
+dmr_methylation = methylation_data.iloc[dmr_index]
+plt.figure(figsize=(8,6))
+plt.bar(range(len(dmr_methylation)), dmr_methylation)
+plt.title(f"Methylation levels at DMR {dmr_index}")
+plt.xlabel("Samples")
+plt.ylabel("Methylation (%)")
+plt.show()
